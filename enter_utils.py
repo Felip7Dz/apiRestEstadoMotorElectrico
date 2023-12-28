@@ -20,6 +20,17 @@ def getDataset(name, samples, first_sample):
     return data[int(first_sample):int(first_sample)+int(samples)], denoised_data
 
 
+def getDatasetNew(name, samples, first_sample):
+    data = np.array(pd.read_csv('prog_analizador/saved_data/'+str(name)+'.csv', header=None, index_col=None))
+    denoised_data = np.array(pd.read_csv('prog_analizador/saved_data/healthy'+str(name)+'.csv', header=None, index_col=None))
+    return data[int(first_sample):int(first_sample)+int(samples)], denoised_data
+
+
+def getNMax(name):
+    data = np.array(pd.read_csv('prog_analizador/saved_data/'+str(name), header=None, index_col=None))
+    return data.shape[0]
+
+
 def createModel(name, input_data):
     input_layer = Input(shape=(input_data.shape[0],))
     encoder = MonotonicityLayer(units=3500)(input_layer)
