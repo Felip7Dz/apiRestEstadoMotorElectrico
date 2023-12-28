@@ -226,14 +226,17 @@ def saveData(dataset_id):
             return jsonify({'error': 'Dataset no encontrado'}), 404
 
         dataset.files_added = 1
+        dataset.min_to_check = 0
+        tmp = enter_utils.getNMax(name)
+        dataset.max_to_check = tmp
         db.session.commit()
         return 'Archivo guardado con éxito', 200
     except Exception as e:
         return str(e), 500
 
 
-@app.route('/analyze_data/<string:session_id>', methods=['POST'])
-def analyzeData(session_id):
+@app.route('/analyze_data/<string:session_id>/<int:flag>', methods=['POST'])
+def analyzeData(session_id, flag):
     try:
         warnings.filterwarnings("ignore")
 
@@ -251,26 +254,49 @@ def analyzeData(session_id):
         FTF = data.get('ftf_req')
 
         healthy_number = data.get('healthy_number_req')
-        healthy_samples, denoised_healthy = enter_utils.getDataset(dataset, healthy_number, 0)
+        if flag == 0:
+            healthy_samples, denoised_healthy = enter_utils.getDataset(dataset, healthy_number, 0)
+
+        if flag == 1:
+            healthy_samples, denoised_healthy = enter_utils.getDatasetNew(dataset, healthy_number, 0)
 
         analyzed_number = data.get('analyzed_number_req')
         first_sample = data.get('first_sample_req')
-        analyzed_samples = enter_utils.getDataset(dataset, analyzed_number, first_sample)[0]
+        if flag == 0:
+            analyzed_samples = enter_utils.getDataset(dataset, analyzed_number, first_sample)[0]
+
+        if flag == 1:
+            analyzed_samples = enter_utils.getDatasetNew(dataset, analyzed_number, first_sample)[0]
 
         model_name = str(dataset) + '.h5'
 
-        if os.path.isfile('prog_analizador/models/' + model_name):
-            custom_objects = {'MonotonicityLayer2': enter_utils.MonotonicityLayer2,
-                              'SmoothingLayer': enter_utils.SmoothingLayer,
-                              'from_config': enter_utils.from_config}
-            ms2ae_model = keras.models.load_model('prog_analizador/models/' + str(model_name), custom_objects=custom_objects,
-                                                  compile=False)
-        else:
-            input_data = healthy_samples[0].reshape(-1, 1)
-            ms2ae_model = enter_utils.createModel('prog_analizador/models/' + str(model_name), input_data)
-            epochs = 5
-            batch_size = 64
-            ms2ae_model.fit(healthy_samples, healthy_samples, epochs=epochs, batch_size=batch_size, verbose=0)
+        if flag == 0:
+            if os.path.isfile('prog_analizador/models/' + model_name):
+                custom_objects = {'MonotonicityLayer2': enter_utils.MonotonicityLayer2,
+                                  'SmoothingLayer': enter_utils.SmoothingLayer,
+                                  'from_config': enter_utils.from_config}
+                ms2ae_model = keras.models.load_model('prog_analizador/models/' + str(model_name), custom_objects=custom_objects,
+                                                      compile=False)
+            else:
+                input_data = healthy_samples[0].reshape(-1, 1)
+                ms2ae_model = enter_utils.createModel('prog_analizador/models/' + str(model_name), input_data)
+                epochs = 5
+                batch_size = 64
+                ms2ae_model.fit(healthy_samples, healthy_samples, epochs=epochs, batch_size=batch_size, verbose=0)
+
+        if flag == 1:
+            if os.path.isfile('prog_analizador/saved/' + model_name):
+                custom_objects = {'MonotonicityLayer2': enter_utils.MonotonicityLayer2,
+                                  'SmoothingLayer': enter_utils.SmoothingLayer,
+                                  'from_config': enter_utils.from_config}
+                ms2ae_model = keras.models.load_model('prog_analizador/saved/' + str(model_name), custom_objects=custom_objects,
+                                                      compile=False)
+            else:
+                input_data = healthy_samples[0].reshape(-1, 1)
+                ms2ae_model = enter_utils.createModel('prog_analizador/saved/' + str(model_name), input_data)
+                epochs = 5
+                batch_size = 64
+                ms2ae_model.fit(healthy_samples, healthy_samples, epochs=epochs, batch_size=batch_size, verbose=0)
 
         HI_healthy_samples = ms2ae_model.predict(healthy_samples, verbose=0)
         HI_analyzed_samples = ms2ae_model.predict(analyzed_samples, verbose=0)
