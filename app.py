@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
 import os
+import shutil
 import warnings
 import keras
 from flask import Flask, jsonify, request, send_file
@@ -166,6 +167,23 @@ def deleteDataset():
         return jsonify({'error': f'Error al eliminar el archivo: {str(e)}'}), 500
 
 
+@app.route('/deleteSample/<int:dataset_id>', methods=['POST'])
+def deleteSample(dataset_id):
+    folder_path = 'prog_analizador/saved_data'
+
+    data = request.json
+    os.remove(os.path.join(folder_path, data.get('healthy')))
+    os.remove(os.path.join(folder_path, data.get('regular')))
+
+    dataset = Dataset.query.get(dataset_id)
+    if not dataset:
+        return jsonify({'error': 'Dataset no encontrado'}), 404
+
+    dataset.files_added = 0
+    db.session.commit()
+    return 'Archivo guardado con éxito', 200
+
+
 @app.route('/getData', methods=['GET'])
 def getData():
 
@@ -245,6 +263,16 @@ def analyzeData(session_id, flag):
         if not os.path.exists(ruta_carpeta):
             os.makedirs(ruta_carpeta)
 
+        for archivo in os.listdir(ruta_carpeta):
+            ruta_archivo = os.path.join(ruta_carpeta, archivo)
+            try:
+                if os.path.isfile(ruta_archivo):
+                    os.unlink(ruta_archivo)
+                elif os.path.isdir(ruta_archivo):
+                    shutil.rmtree(ruta_archivo)
+            except Exception as e:
+                print(f"No se pudo eliminar {ruta_archivo}. Error: {e}")
+
         data = request.json
         dataset = data.get('nombre_req')
         sampling_frequency = data.get('sampling_frequency_req')
@@ -319,23 +347,15 @@ def analyzeData(session_id, flag):
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/get_image1/<string:session_id>', methods=['GET'])
-def getImage1(session_id):
+@app.route('/get_image/<string:session_id>/<int:flag>', methods=['GET'])
+def getImage1(session_id, flag):
     try:
-        image_path = os.path.join('img/' + session_id, 'ploot1.png')
+        image_path = os.path.join('img/' + session_id, f'plot{flag}.png')
 
-        return send_file(image_path, mimetype='image/png')
-
-    except Exception as e:
-        return f'Error: {str(e)}', 500
-
-
-@app.route('/get_image2/<string:session_id>', methods=['GET'])
-def getImage2(session_id):
-    try:
-        image_path = os.path.join('img/' + session_id, 'ploot2.png')
-
-        return send_file(image_path, mimetype='image/png')
+        if os.path.exists(image_path):
+            return send_file(image_path, mimetype='image/png')
+        else:
+            return 'Image not found', 200
 
     except Exception as e:
         return f'Error: {str(e)}', 500
