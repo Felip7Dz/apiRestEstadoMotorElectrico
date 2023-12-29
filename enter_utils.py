@@ -63,7 +63,7 @@ class MonotonicityLayer2(layers.Layer):
         self.units = units
 
     def build(self, input_shape):
-        self.mask = self.add_weight(name="adfsadfa",shape=input_shape[1:], initializer=tf.keras.initializers.Ones(), trainable=True)
+        self.mask = self.add_weight(name="adfsadfa", shape=input_shape[1:], initializer=tf.keras.initializers.Ones(), trainable=True)
         super(MonotonicityLayer2, self).build(input_shape)
 
     def call(self, inputs):
@@ -145,7 +145,7 @@ def filteredFFT(order, fs, low_freq, high_freq, signal):
     b, a = butter(order, [low, high], btype='band')
     filtered_signal = filtfilt(b, a, signal)
     envelope = np.abs(filtered_signal)
-    fft_env, freq = np.abs(get_power_spectrum(np.hanning(len(envelope))*envelope,fs,0))
+    fft_env, freq = np.abs(get_power_spectrum(np.hanning(len(envelope))*envelope, fs, 0))
     fft_env[0:5] = 0
     return fft_env, freq
 
@@ -195,10 +195,6 @@ def determineFailure(ruta_carpeta, data, healthydata, hi_value, fs, fstart, fend
                 important_f_expected_peaks.append(freq)
 
     fft_nf, freqs = get_power_spectrum(data, fs)
-    plt.plot(fft_nf)
-    plt.savefig(os.path.join(ruta_carpeta, 'ploot1.png'))
-    plt.plot(freqs)
-    plt.savefig(os.path.join(ruta_carpeta, 'ploot2.png'))
     indices = argrelextrema(fft_nf, np.greater)
     amplitudes = []
     for elem in indices[0]:
@@ -272,25 +268,41 @@ def determineFailure(ruta_carpeta, data, healthydata, hi_value, fs, fstart, fend
                 result['fault_type'].append("Outer_race")
                 if (len(common_member(important_f_expected_peaks, bpfo_freq))>0):
                     result['fault_details'].append(common_member(important_f_expected_peaks, bpfo_freq))
+                    generateImg(common_member(important_f_expected_peaks, bpfo_freq), fft_f, freqs, ruta_carpeta, 1, "Outer-race")
                 elif (len(common_member(important_nf_expected_peaks, bpfo_freq))>0):
                     result['fault_details'].append(common_member(important_nf_expected_peaks, bpfo_freq))
+                    generateImg(common_member(important_nf_expected_peaks, bpfo_freq), fft_f, freqs, ruta_carpeta, 1, "Outer-race")
             if (bpfi_status > 0):
                 result['fault_type'].append("Inner_race")
                 if (len(common_member(important_f_expected_peaks, bpfi_freq))>0):
                     result['fault_details'].append(common_member(important_f_expected_peaks, bpfi_freq))
+                    generateImg(common_member(important_f_expected_peaks, bpfi_freq), fft_f, freqs, ruta_carpeta, 2, "Inner-race")
                 elif (len(common_member(important_nf_expected_peaks, bpfi_freq))>0):
                     result['fault_details'].append(common_member(important_nf_expected_peaks, bpfi_freq))
+                    generateImg(common_member(important_nf_expected_peaks, bpfi_freq), fft_f, freqs, ruta_carpeta, 2, "Inner-race")
             if (bsf_status > 0):
                 result['fault_type'].append("Bearing_Balls")
                 if (len(common_member(important_f_expected_peaks, bsf_freq))>0):
                     result['fault_details'].append(common_member(important_f_expected_peaks, bsf_freq))
+                    generateImg(common_member(important_f_expected_peaks, bsf_freq), fft_f, freqs, ruta_carpeta, 3, "Bearing Balls")
                 elif (len(common_member(important_nf_expected_peaks, bsf_freq))>0):
                     result['fault_details'].append(common_member(important_nf_expected_peaks, bsf_freq))
+                    generateImg(common_member(important_nf_expected_peaks, bsf_freq), fft_f, freqs, ruta_carpeta, 3, "Bearing Balls")
             if (ftf_status > 0):
                 result['fault_type'].append("Cage")
                 if (len(common_member(important_f_expected_peaks, ftf_freq))>0):
                     result['fault_details'].append(common_member(important_f_expected_peaks, ftf_freq))
+                    generateImg(common_member(important_f_expected_peaks, ftf_freq), fft_f, freqs, ruta_carpeta, 4, "Cage")
                 elif (len(common_member(important_nf_expected_peaks, ftf_freq))>0):
                     result['fault_details'].append(common_member(important_nf_expected_peaks, ftf_freq))
+                    generateImg(common_member(important_nf_expected_peaks, ftf_freq), fft_f, freqs, ruta_carpeta, 4, "Cage")
 
     return result
+
+
+def generateImg(members, fft_env, freq, carpeta, flag, name):
+    for member in members:
+        plt.axvline(member, color='red')
+    plt.plot(freq[0:5000], fft_env[0:5000], color="blue")
+    plt.title(name)
+    plt.savefig(os.path.join(carpeta, f'plot{flag}.png'))
