@@ -11,6 +11,7 @@ import enter_utils
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:12345678@localhost:3306/PreLoadedDatasets'
+app.config['SQLALCHEMY_BINDS'] = {'users': 'mysql+mysqlconnector://root:12345678@localhost:3306/RegisteredUsers'}
 db = SQLAlchemy(app)
 
 
@@ -28,6 +29,51 @@ class Dataset(db.Model):
     min_to_check = db.Column(db.Integer, nullable=False)
     max_to_check = db.Column(db.Integer, nullable=False)
     files_added = db.Column(db.Integer, nullable=False)
+
+
+class Usuarios(db.Model):
+    __bind_key__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    usuario = db.Column(db.String(255), unique=True, nullable=False)
+    nombre = db.Column(db.String(255), unique=True, nullable=False)
+    apellido = db.Column(db.String(255), unique=True, nullable=False)
+    email = db.Column(db.String(255), unique=True, nullable=False)
+    passw = db.Column(db.String(255), unique=True, nullable=False)
+    role = db.Column(db.String(255), unique=True, nullable=False)
+
+
+@app.route('/checkUser/<string:username>', methods=['GET'])
+def checkUser(username):
+    user_preloaded = Usuarios.query.filter_by(usuario=username).first()
+
+    if user_preloaded:
+        return '0', 200
+
+    return '1', 200
+
+
+@app.route('/registerUser', methods=['POST'])
+def registerUser():
+    try:
+        data = request.json
+
+        new_user = Usuarios(
+            usuario=data['usuario'],
+            nombre=data['nombre'],
+            apellido=data['apellido'],
+            email=data['email'],
+            passw=data['passw'],
+            role=data['role']
+        )
+
+        db.session.add(new_user)
+        db.session.commit()
+
+        return '0', 201
+
+    except Exception as e:
+        print(f"IntegrityError: {str(e)}")
+        return '1', 500
 
 
 @app.route('/getDatasetByName/<string:dataset_name>', methods=['GET'])
@@ -348,7 +394,7 @@ def analyzeData(session_id, flag):
 
 
 @app.route('/get_image/<string:session_id>/<int:flag>', methods=['GET'])
-def getImage1(session_id, flag):
+def getImage(session_id, flag):
     try:
         image_path = os.path.join('img/' + session_id, f'plot{flag}.png')
 
