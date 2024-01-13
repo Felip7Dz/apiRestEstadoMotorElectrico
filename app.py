@@ -39,7 +39,7 @@ class Usuarios(db.Model):
     apellido = db.Column(db.String(255), unique=True, nullable=False)
     email = db.Column(db.String(255), unique=True, nullable=False)
     passw = db.Column(db.String(255), unique=True, nullable=False)
-    role = db.Column(db.String(255), unique=True, nullable=False)
+    roles = db.Column(db.String(255), unique=True, nullable=False)
 
 
 @app.route('/checkUser/<string:username>', methods=['GET'])
@@ -63,7 +63,7 @@ def registerUser():
             apellido=data['apellido'],
             email=data['email'],
             passw=data['passw'],
-            role=data['role']
+            roles=data['role']
         )
 
         db.session.add(new_user)
@@ -142,7 +142,7 @@ def updateDataset(dataset_id):
         if not dataset:
             return jsonify({'error': 'Dataset no encontrado'}), 404
 
-        os.rename('prog_analizador/saved/' + dataset.nombre + '.csv', 'prog_analizador/saved/' + data['nombre'] + '.csv')
+        os.rename('prog_analizador/saved_models/' + dataset.nombre + '.csv', 'prog_analizador/saved_models/' + data['nombre'] + '.csv')
 
         dataset.nombre = data.get('nombre', dataset.nombre)
         dataset.shaft_frequency = data.get('shaft_frequency', dataset.shaft_frequency)
@@ -172,20 +172,23 @@ def getModelsList():
     return jsonify({'modelsList': nombres_elementos})
 
 
-@app.route('/getSavedModelsList', methods=['GET'])
-def getSavedModelsList():
+@app.route('/getSavedModelsList/<string:user>', methods=['GET'])
+def getSavedModelsList(user):
 
-    ruta_data = os.path.join(os.path.dirname(__file__), 'prog_analizador/saved')
+    ruta_data = os.path.join(os.path.dirname(__file__), 'prog_analizador/saved_models/' + user)
+
+    if not os.path.exists(ruta_data):
+        os.makedirs(ruta_data)
 
     nombres_elementos = os.listdir(ruta_data)
 
     return jsonify({'modelsList': nombres_elementos})
 
 
-@app.route('/deleteDataset', methods=['POST'])
-def deleteDataset():
+@app.route('/deleteDataset/<string:user>', methods=['POST'])
+def deleteDataset(user):
     try:
-        folder_path = 'prog_analizador/saved'
+        folder_path = 'prog_analizador/saved_models/' + user
 
         filename_with_extension = request.json.get('nombre')
 
@@ -195,9 +198,9 @@ def deleteDataset():
 
         if os.path.exists(file_path):
             os.remove(file_path)
-            if os.path.exists(os.path.join('prog_analizador/saved_data', filename_without_extension + '.csv')):
-                os.remove(os.path.join('prog_analizador/saved_data', 'healthy' + filename_without_extension + '.csv'))
-                os.remove(os.path.join('prog_analizador/saved_data', filename_without_extension + '.csv'))
+            if os.path.exists(os.path.join('prog_analizador/saved_data/' + user, filename_without_extension + '.csv')):
+                os.remove(os.path.join('prog_analizador/saved_data/' + user, 'healthy' + filename_without_extension + '.csv'))
+                os.remove(os.path.join('prog_analizador/saved_data/' + user, filename_without_extension + '.csv'))
 
             dataset = Dataset.query.filter_by(nombre=filename_without_extension).first()
 
@@ -213,9 +216,9 @@ def deleteDataset():
         return jsonify({'error': f'Error al eliminar el archivo: {str(e)}'}), 500
 
 
-@app.route('/deleteSample/<int:dataset_id>', methods=['POST'])
-def deleteSample(dataset_id):
-    folder_path = 'prog_analizador/saved_data'
+@app.route('/deleteSample/<int:dataset_id>/<string:user>', methods=['POST'])
+def deleteSample(dataset_id, user):
+    folder_path = 'prog_analizador/saved_data/' + user
 
     data = request.json
     os.remove(os.path.join(folder_path, data.get('healthy')))
@@ -240,14 +243,14 @@ def getData():
     return jsonify({'modelsList': nombres_elementos})
 
 
-def guardar_archivo(archivo, flag):
+def guardar_archivo(archivo, flag, user):
     carpeta_guardado: str = ''
     try:
 
         if flag==0:
-            carpeta_guardado = 'prog_analizador/saved'
+            carpeta_guardado = 'prog_analizador/saved_models/' + user
         if flag==1:
-            carpeta_guardado = 'prog_analizador/saved_data'
+            carpeta_guardado = 'prog_analizador/saved_data/' + user
 
         ruta_guardado = os.path.join(os.path.dirname(__file__), carpeta_guardado)
 
@@ -265,25 +268,25 @@ def guardar_archivo(archivo, flag):
         raise e
 
 
-@app.route('/guardar_archivo', methods=['POST'])
-def guardarArchivo():
+@app.route('/guardar_archivo/<string:user>', methods=['POST'])
+def guardarArchivo(user):
     try:
         flag = 0
-        guardar_archivo(request.files.get('archivo'), flag)
+        guardar_archivo(request.files.get('archivo'), flag, user)
 
         return 'Archivo guardado con éxito', 200
     except Exception as e:
         return str(e), 500
 
 
-@app.route('/saveData/<int:dataset_id>', methods=['POST'])
-def saveData(dataset_id):
+@app.route('/saveData/<int:dataset_id>/<string:user>', methods=['POST'])
+def saveData(dataset_id, user):
     try:
         flag = 1
         name = request.form['fileName']
         ogName = request.form['ogName']
-        guardar_archivo(request.files.get('archivo'), flag)
-        os.rename('prog_analizador/saved_data/' + ogName, 'prog_analizador/saved_data/' + name)
+        guardar_archivo(request.files.get('archivo'), flag, user)
+        os.rename('prog_analizador/saved_data/' + user + '/' + ogName, 'prog_analizador/saved_data/' + user + '/' + name)
 
         dataset = Dataset.query.get(dataset_id)
         if not dataset:
@@ -291,7 +294,7 @@ def saveData(dataset_id):
 
         dataset.files_added = 1
         dataset.min_to_check = 0
-        tmp = enter_utils.getNMax(name)
+        tmp = enter_utils.getNMax(name, user)
         dataset.max_to_check = tmp
         db.session.commit()
         return 'Archivo guardado con éxito', 200
@@ -332,7 +335,7 @@ def analyzeData(session_id, flag):
             healthy_samples, denoised_healthy = enter_utils.getDataset(dataset, healthy_number, 0)
 
         if flag == 1:
-            healthy_samples, denoised_healthy = enter_utils.getDatasetNew(dataset, healthy_number, 0)
+            healthy_samples, denoised_healthy = enter_utils.getDatasetNew(dataset, healthy_number, 0, session_id)
 
         analyzed_number = data.get('analyzed_number_req')
         first_sample = data.get('first_sample_req')
@@ -340,7 +343,7 @@ def analyzeData(session_id, flag):
             analyzed_samples = enter_utils.getDataset(dataset, analyzed_number, first_sample)[0]
 
         if flag == 1:
-            analyzed_samples = enter_utils.getDatasetNew(dataset, analyzed_number, first_sample)[0]
+            analyzed_samples = enter_utils.getDatasetNew(dataset, analyzed_number, first_sample, session_id)[0]
 
         model_name = str(dataset) + '.h5'
 
@@ -359,15 +362,15 @@ def analyzeData(session_id, flag):
                 ms2ae_model.fit(healthy_samples, healthy_samples, epochs=epochs, batch_size=batch_size, verbose=0)
 
         if flag == 1:
-            if os.path.isfile('prog_analizador/saved/' + model_name):
+            if os.path.isfile('prog_analizador/saved_models/' + session_id + '/' + model_name):
                 custom_objects = {'MonotonicityLayer2': enter_utils.MonotonicityLayer2,
                                   'SmoothingLayer': enter_utils.SmoothingLayer,
                                   'from_config': enter_utils.from_config}
-                ms2ae_model = keras.models.load_model('prog_analizador/saved/' + str(model_name), custom_objects=custom_objects,
+                ms2ae_model = keras.models.load_model('prog_analizador/saved_models/' + session_id + '/' + str(model_name), custom_objects=custom_objects,
                                                       compile=False)
             else:
                 input_data = healthy_samples[0].reshape(-1, 1)
-                ms2ae_model = enter_utils.createModel('prog_analizador/saved/' + str(model_name), input_data)
+                ms2ae_model = enter_utils.createModel('prog_analizador/saved_models/' + session_id + '/' + str(model_name), input_data)
                 epochs = 5
                 batch_size = 64
                 ms2ae_model.fit(healthy_samples, healthy_samples, epochs=epochs, batch_size=batch_size, verbose=0)
