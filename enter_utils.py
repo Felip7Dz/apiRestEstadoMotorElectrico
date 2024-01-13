@@ -301,8 +301,12 @@ def determineFailure(ruta_carpeta, data, healthydata, hi_value, fs, fstart, fend
 
 
 def generateImg(members, fft_env, freq, carpeta, flag, name):
-    for member in members:
-        plt.axvline(member, color='red')
+    colors = ['red', 'green', 'blue', 'orange', 'purple']
+
+    plt.figure()
+
+    for i, member in enumerate(members):
+        plt.axvline(member, color=colors[i % len(colors)])
     plt.plot(freq[0:5000], fft_env[0:5000], color="blue")
     plt.title(name)
     plt.savefig(os.path.join(carpeta, f'plot{flag}.png'))
