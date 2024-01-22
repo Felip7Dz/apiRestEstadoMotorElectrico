@@ -57,7 +57,7 @@ def _get_two_sided_amplitude_spectrum(data, fs, n_padding):
     return xdft, freqs
 
 
-class MonotonicityLayer2(layers.Layer):
+class MonotonicityLayer2(tf.keras.layers.Layer):
     def __init__(self, units, **kwargs):
         super(MonotonicityLayer2, self).__init__(**kwargs)
         self.units = units
@@ -66,7 +66,7 @@ class MonotonicityLayer2(layers.Layer):
         self.mask = self.add_weight(name="adfsadfa", shape=input_shape[1:], initializer=tf.keras.initializers.Ones(), trainable=True)
         super(MonotonicityLayer2, self).build(input_shape)
 
-    def call(self, inputs):
+    def call(self, inputs, **kwargs):
         masked_inputs = tf.multiply(inputs, self.mask)
         return masked_inputs
 
