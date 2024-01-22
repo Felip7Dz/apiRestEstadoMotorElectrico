@@ -6,12 +6,11 @@ import warnings
 import keras
 from flask import Flask, jsonify, request, send_file
 from flask_sqlalchemy import SQLAlchemy
-
 import enter_utils
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:12345678@localhost:3306/PreLoadedDatasets'
-app.config['SQLALCHEMY_BINDS'] = {'users': 'mysql+mysqlconnector://root:12345678@localhost:3306/RegisteredUsers'}
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:password@localhost:3306/PreLoadedDatasets'
+app.config['SQLALCHEMY_BINDS'] = {'users': 'mysql+mysqlconnector://root:password@localhost:3306/RegisteredUsers'}
 db = SQLAlchemy(app)
 
 
@@ -168,8 +167,9 @@ def getModelsList():
     ruta_data = os.path.join(os.path.dirname(__file__), 'prog_analizador/models')
 
     nombres_elementos = os.listdir(ruta_data)
+    nombres_elementos_ordenados = sorted(nombres_elementos)
 
-    return jsonify({'modelsList': nombres_elementos})
+    return jsonify({'modelsList': nombres_elementos_ordenados})
 
 
 @app.route('/getSavedModelsList/<string:user>', methods=['GET'])
@@ -181,8 +181,9 @@ def getSavedModelsList(user):
         os.makedirs(ruta_data)
 
     nombres_elementos = os.listdir(ruta_data)
+    nombres_elementos_ordenados = sorted(nombres_elementos)
 
-    return jsonify({'modelsList': nombres_elementos})
+    return jsonify({'modelsList': nombres_elementos_ordenados})
 
 
 @app.route('/deleteDataset/<string:user>', methods=['POST'])
