@@ -234,16 +234,6 @@ def deleteSample(dataset_id, user):
     return 'Archivo guardado con éxito', 200
 
 
-@app.route('/getData', methods=['GET'])
-def getData():
-
-    ruta_data = os.path.join(os.path.dirname(__file__), 'prog_analizador/data')
-
-    nombres_elementos = os.listdir(ruta_data)
-
-    return jsonify({'modelsList': nombres_elementos})
-
-
 def guardar_archivo(archivo, flag, user):
     carpeta_guardado: str = ''
     try:
