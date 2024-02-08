@@ -31,6 +31,7 @@ class Dataset(db.Model):
 
 
 class Usuarios(db.Model):
+    __tablename__ = 'Usuarios'
     __bind_key__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     usuario = db.Column(db.String(255), unique=True, nullable=False)
@@ -73,6 +74,85 @@ def registerUser():
     except Exception as e:
         print(f"IntegrityError: {str(e)}")
         return '1', 500
+
+
+@app.route('/getUser/<string:username>', methods=['GET'])
+def getUserByName(username):
+    try:
+        user = Usuarios.query.filter_by(usuario=username).first()
+        if user:
+            return jsonify({
+                'usuario': user.usuario,
+                'nombre': user.nombre,
+                'apellido': user.apellido,
+                'email': user.email
+            })
+        else:
+            return jsonify({'nombre': 'Dataset not found'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/getAllUsers', methods=['GET'])
+def getAllUsers():
+    try:
+        users = Usuarios.query.all()
+        if users:
+            users_list = []
+            for user in users:
+                user_data = {
+                    'usuario': user.usuario,
+                    'nombre': user.nombre,
+                    'apellido': user.apellido,
+                    'email': user.email,
+                    'role': user.roles
+                }
+                users_list.append(user_data)
+            return jsonify(users_list)
+        else:
+            return jsonify({'message': 'No users found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/updateUser/<string:username>', methods=['PUT'])
+def updateUser(username):
+    try:
+        data = request.json
+        user = Usuarios.query.filter_by(usuario=username).first()
+
+        user.usuario = data.get('usuario', user.usuario)
+        user.nombre = data.get('nombre', user.nombre)
+        user.apellido = data.get('apellido', user.apellido)
+        user.email = data.get('email', user.email)
+        user.passw = data.get('passw', user.passw)
+        db.session.commit()
+
+        return jsonify({'message': 'Dataset actualizado correctamente'}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/deleteUser/<string:username>', methods=['DELETE'])
+def deleteUser(username):
+    try:
+        user = Usuarios.query.filter_by(usuario=username).first()
+
+        db.session.delete(user)
+        db.session.commit()
+
+        folder_path1 = 'prog_analizador/saved_models/' + username
+        folder_path2 = 'prog_analizador/saved_data/' + username
+        if os.path.exists(folder_path1) and os.path.isdir(folder_path1):
+            os.rmdir(folder_path1)
+        if os.path.exists(folder_path2) and os.path.isdir(folder_path2):
+            os.rmdir(folder_path2)
+
+        return jsonify({'message': f'Usuario {username} eliminado correctamente'}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/getDatasetByName/<string:dataset_name>', methods=['GET'])
