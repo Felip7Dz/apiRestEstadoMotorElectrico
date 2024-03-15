@@ -33,7 +33,7 @@ def getNMax(name, user):
 
 def createModel(name, input_data):
     input_layer = Input(shape=(input_data.shape[0],))
-    encoder = MonotonicityLayer(units=3500)(input_layer)
+    encoder = MonotonicityLayer2(units=3500)(input_layer)
     encoder = Dense(700, activation='sigmoid')(encoder)
     encoder = SmoothingLayer(200)(encoder)
     encoder = Dense(1, activation='sigmoid')(encoder)
