@@ -445,6 +445,7 @@ def analyzeData(session_id, flag):
                 epochs = 5
                 batch_size = 64
                 ms2ae_model.fit(healthy_samples, healthy_samples, epochs=epochs, batch_size=batch_size, verbose=0)
+                os.remove('prog_analizador/saved_models/' + session_id + '/' + str(dataset) + '.csv')
 
         HI_healthy_samples = ms2ae_model.predict(healthy_samples, verbose=0)
         HI_analyzed_samples = ms2ae_model.predict(analyzed_samples, verbose=0)
