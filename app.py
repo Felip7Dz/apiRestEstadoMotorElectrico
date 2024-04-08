@@ -182,8 +182,8 @@ def getDatasetByName(dataset_name):
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/createDataset', methods=['POST'])
-def insertDataset():
+@app.route('/createDataset/<string:username>', methods=['POST'])
+def insertDataset(username):
     try:
         data = request.json
 
@@ -204,6 +204,12 @@ def insertDataset():
 
         db.session.add(new_dataset)
         db.session.commit()
+
+        with open('prog_analizador/saved_models/' + username + '/' + data['nombre'] + '.csv', 'w', newline='') as archivo_csv:
+            escritor_csv = csv.writer(archivo_csv)
+            escritor_csv.writerow(
+                ['Nombre', 'Shaft Frequency', 'Sampling Frequency', 'Carga', 'Bearing Type', 'BPFO', 'BPFI', 'BSF',
+                 'FTF', 'Min to Check', 'Max to Check', 'Files Added'])
 
         return '0', 201
 
