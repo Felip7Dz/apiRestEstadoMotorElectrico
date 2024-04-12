@@ -273,6 +273,25 @@ def getSavedModelsList(user):
     return jsonify({'modelsList': nombres_elementos_ordenados})
 
 
+@app.route('/getAllSavedModelsList', methods=['GET'])
+def getAllSavedModelsList():
+    archivos = []
+    ruta_base = 'prog_analizador/saved_models'
+
+    for carpeta in os.listdir(ruta_base):
+        ruta_carpeta = os.path.join(ruta_base, carpeta)
+        for archivo in os.listdir(ruta_carpeta):
+            ruta_archivo = os.path.join(ruta_carpeta, archivo)
+            if os.path.isfile(ruta_archivo):
+
+                nombre_archivo = os.path.splitext(archivo)[0]
+                nombre_carpeta = carpeta
+
+                archivos.append(f"{nombre_archivo} ({nombre_carpeta})")
+
+    return jsonify({'modelsList': archivos})
+
+
 @app.route('/deleteDataset/<string:user>', methods=['POST'])
 def deleteDataset(user):
     try:
