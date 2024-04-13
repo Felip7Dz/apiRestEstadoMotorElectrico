@@ -300,7 +300,7 @@ def deleteDataset(user):
         filename_with_extension = request.json.get('nombre')
 
         filename_without_extension, _ = os.path.splitext(filename_with_extension)
-        
+
         if (user == 'admin'):
             tmp = filename_with_extension.split("(")
             filename_without_extension = tmp[0].strip()
@@ -308,7 +308,7 @@ def deleteDataset(user):
             filename_with_extension = tmp[0].strip() + '.csv'
             if not os.path.exists(os.path.join(folder_path, filename_with_extension)):
                 filename_with_extension = tmp[0].strip() + '.h5'
-        
+
         file_path = os.path.join(folder_path, filename_with_extension)
 
         if os.path.exists(file_path):
@@ -337,7 +337,8 @@ def deleteSample(dataset_id, user):
 
     data = request.json
     os.remove(os.path.join(folder_path, data.get('healthy')))
-    os.remove(os.path.join(folder_path, data.get('regular')))
+    if os.path.exists(os.path.join(folder_path, data.get('regular'))):
+        os.remove(os.path.join(folder_path, data.get('regular')))
 
     dataset = Dataset.query.get(dataset_id)
     if not dataset:
@@ -397,7 +398,11 @@ def saveData(dataset_id, user):
         if not dataset:
             return jsonify({'error': 'Dataset no encontrado'}), 404
 
-        dataset.files_added = 1
+        if name.startswith('healthy'):
+            dataset.files_added = 2
+        else:
+            dataset.files_added = 1
+
         dataset.min_to_check = 0
         tmp = enter_utils.getNMax(name, user)
         dataset.max_to_check = tmp
