@@ -501,6 +501,12 @@ def analyzeData(session_id, flag):
         freq_interest = [float(BPFO), float(BPFI), float(BSF), float(FTF)]
         result = enter_utils.determineFailure(ruta_carpeta, diff_harmonics, HI_healthy_samples, HI_analyzed_samples[faultySample], float(sampling_frequency), fstart, fend, freq_interest, 5)
 
+        if isFaulty:
+            enter_utils.matriz_full(analyzed_samples, HI_analyzed_samples, ruta_carpeta, 5)
+            enter_utils.matriz_full2(analyzed_samples, HI_analyzed_samples, ruta_carpeta, 6)
+            enter_utils.matriz_simple(analyzed_samples, HI_analyzed_samples, ruta_carpeta, 7)
+            enter_utils.matriz_simple2(analyzed_samples, HI_analyzed_samples, ruta_carpeta, 8)
+
         return jsonify(result), 200
 
     except Exception as e:
