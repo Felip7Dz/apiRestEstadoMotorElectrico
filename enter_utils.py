@@ -11,7 +11,9 @@ from scipy.spatial.distance import euclidean
 import matlab.engine
 from scipy.signal import butter, filtfilt, argrelextrema
 import pandas as pd
+import seaborn as sns
 from keras.models import Model
+import utils_explainability
 
 
 def getDataset(name, samples, first_sample):
@@ -255,7 +257,7 @@ def determineFailure(ruta_carpeta, data, healthydata, hi_value, fs, fstart, fend
     elif (hi_value < last_threshold):
         result['fault_info'] = "A fault has been detected in a medium stage"
     else:
-        result['fault_info'] = "A fault has been detetcetd in a last degradation stage"
+        result['fault_info'] = "A fault has been detected in a last degradation stage"
 
     if not stop:
         if (bpfo_status+bpfi_status+ftf_status+bsf_status == 0):
@@ -315,3 +317,49 @@ def generateImg(members, fft_env, freq, carpeta, flag, name):
 
     plt.title(name)
     plt.savefig(os.path.join(carpeta, f'plot{flag}.png'))
+
+
+def matriz_full(bear3, hi_curve_ims1, ruta_carpeta, flag):
+    num_subsamples = 16
+    overlap = False
+    percentage = 0.5
+    res = utils_explainability.getCorrelationTime(bear3, hi_curve_ims1, num_subsamples, overlap, percentage)
+    columns = utils_explainability.create_columnname(num_subsamples)
+    index = ['HI', 'Fund. Filtered', 'BPFO Filtered', 'BPFI Filtered', 'FTF Filtered', 'BSF Filtered',
+             'Fundamental', 'BPFO', 'BPFI', 'FTF', 'BSF']
+    cm = pd.DataFrame(np.abs(res), columns=columns, index=index)
+    plt.figure(figsize=(13, 9))
+    sns.heatmap(cm, annot=False, cmap='coolwarm', vmin=0, vmax=1)
+    plt.savefig(os.path.join(ruta_carpeta, f'plot{flag}.png'))
+
+
+def matriz_full2(bear3, hi_curve_ims1, ruta_carpeta, flag):
+    num_subsamples = 16
+    overlap = False
+    percentage = 0.5
+    res = utils_explainability.getTimeCorrelationTimeDomain(bear3, hi_curve_ims1, num_subsamples, overlap, percentage)
+    columns = utils_explainability.create_columnname(num_subsamples)
+    index = ['HI', 'RMS', 'Sk', 'K', 'CF', 'SF', 'IF', 'MF']
+    cm = pd.DataFrame(np.abs(res), columns=columns, index=index)
+    plt.figure(figsize=(12, 8))
+    sns.heatmap(cm, annot=False, cmap='coolwarm', vmin=0, vmax=1)
+    plt.savefig(os.path.join(ruta_carpeta, f'plot{flag}.png'))
+
+
+def matriz_simple(bear3, hi_curve_ims1, ruta_carpeta, flag):
+    correlation_matrix = utils_explainability.getCorrelationTimeDomain(bear3, hi_curve_ims1)
+    labels = ['HI', 'RMS', 'Sk', 'K', 'CF', 'SF', 'IF', 'MF']
+    cm = pd.DataFrame(np.abs(correlation_matrix.values), columns=labels, index=labels)
+    plt.figure(figsize=(12, 7))
+    sns.heatmap(cm, annot=True, cmap='coolwarm', vmin=0, vmax=1)
+    plt.savefig(os.path.join(ruta_carpeta, f'plot{flag}.png'))
+
+
+def matriz_simple2(bear3, hi_curve_ims1, ruta_carpeta, flag):
+    correlation_matrix = utils_explainability.getCorrelationFreqDomain(bear3, hi_curve_ims1)
+    labels = ['HI', 'Fund. Filtered', 'BPFO Filtered', 'BPFI Filtered', 'FTF Filtered', 'BSF Filtered',
+              'Fundamental', 'BPFO', 'BPFI', 'FTF', 'BSF']
+    cm = pd.DataFrame(np.abs(correlation_matrix.values), columns=labels, index=labels)
+    plt.figure(figsize=(11, 8))
+    sns.heatmap(cm, annot=True, cmap='coolwarm', vmin=0, vmax=1)
+    plt.savefig(os.path.join(ruta_carpeta, f'plot{flag}.png'))
