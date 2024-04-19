@@ -393,6 +393,14 @@ def saveData(dataset_id, user):
         ogName = request.form['ogName']
         guardar_archivo(request.files.get('archivo'), flag, user)
         os.rename('prog_analizador/saved_data/' + user + '/' + ogName, 'prog_analizador/saved_data/' + user + '/' + name)
+        tmp = enter_utils.getNMax(name, user)
+
+        if name.startswith('healthy') and tmp < 30:
+            os.remove('prog_analizador/saved_data/' + user + '/' + name)
+            return 'El archivo "healthy" debe tener al menos 30 muestras.', 400
+        elif not name.startswith('healthy') and tmp < 5:
+            os.remove('prog_analizador/saved_data/' + user + '/' + name)
+            return 'El archivo debe tener al menos 5 muestras.', 400
 
         dataset = Dataset.query.get(dataset_id)
         if not dataset:
@@ -404,7 +412,6 @@ def saveData(dataset_id, user):
             dataset.files_added = 1
 
         dataset.min_to_check = 0
-        tmp = enter_utils.getNMax(name, user)
         dataset.max_to_check = tmp
         db.session.commit()
         return 'Archivo guardado con éxito', 200
@@ -439,6 +446,7 @@ def analyzeData(session_id, flag):
         BPFI = data.get('bpfi_req')
         BSF = data.get('bsf_req')
         FTF = data.get('ftf_req')
+        shaft_frequency = data.get('shaft_frequency_req')
 
         healthy_number = data.get('healthy_number_req')
         if flag == 0:
@@ -502,10 +510,14 @@ def analyzeData(session_id, flag):
         result = enter_utils.determineFailure(ruta_carpeta, diff_harmonics, HI_healthy_samples, HI_analyzed_samples[faultySample], float(sampling_frequency), fstart, fend, freq_interest, 5)
 
         if isFaulty:
-            enter_utils.matriz_full(analyzed_samples, HI_analyzed_samples, ruta_carpeta, 5)
-            enter_utils.matriz_full2(analyzed_samples, HI_analyzed_samples, ruta_carpeta, 6)
-            enter_utils.matriz_simple(analyzed_samples, HI_analyzed_samples, ruta_carpeta, 7)
-            enter_utils.matriz_simple2(analyzed_samples, HI_analyzed_samples, ruta_carpeta, 8)
+            if flag == 1:
+                tmp_samples = enter_utils.getDatasetNew(dataset, first_sample + analyzed_number, 0, session_id)[0]
+            else:
+                tmp_samples = enter_utils.getDataset(dataset, first_sample + analyzed_number, 0)[0]
+            enter_utils.matriz_full(tmp_samples, ms2ae_model.predict(tmp_samples, verbose=0), ruta_carpeta, 5, int(sampling_frequency), int(shaft_frequency), int(BPFO), int(BPFI), int(BSF), int(FTF))
+            enter_utils.matriz_full2(tmp_samples, ms2ae_model.predict(tmp_samples, verbose=0), ruta_carpeta, 6)
+            enter_utils.matriz_simple(tmp_samples, ms2ae_model.predict(tmp_samples, verbose=0), ruta_carpeta, 7)
+            enter_utils.matriz_simple2(tmp_samples, ms2ae_model.predict(tmp_samples, verbose=0), ruta_carpeta, 8, int(sampling_frequency), int(shaft_frequency), int(BPFO), int(BPFI), int(BSF), int(FTF))
 
         return jsonify(result), 200
 
