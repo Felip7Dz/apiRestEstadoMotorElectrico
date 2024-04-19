@@ -319,11 +319,11 @@ def generateImg(members, fft_env, freq, carpeta, flag, name):
     plt.savefig(os.path.join(carpeta, f'plot{flag}.png'))
 
 
-def matriz_full(bear3, hi_curve_ims1, ruta_carpeta, flag):
+def matriz_full(bear3, hi_curve_ims1, ruta_carpeta, flag, sampling_frequency, shaft_frequency, BPFO, BPFI, BSF, FTF):
     num_subsamples = 16
     overlap = False
     percentage = 0.5
-    res = utils_explainability.getCorrelationTime(bear3, hi_curve_ims1, num_subsamples, overlap, percentage)
+    res = utils_explainability.getCorrelationTime(bear3, hi_curve_ims1, num_subsamples, overlap, percentage, sampling_frequency, BPFO, BPFI, BSF, FTF, shaft_frequency)
     columns = utils_explainability.create_columnname(num_subsamples)
     index = ['HI', 'Fund. Filtered', 'BPFO Filtered', 'BPFI Filtered', 'FTF Filtered', 'BSF Filtered',
              'Fundamental', 'BPFO', 'BPFI', 'FTF', 'BSF']
@@ -355,8 +355,8 @@ def matriz_simple(bear3, hi_curve_ims1, ruta_carpeta, flag):
     plt.savefig(os.path.join(ruta_carpeta, f'plot{flag}.png'))
 
 
-def matriz_simple2(bear3, hi_curve_ims1, ruta_carpeta, flag):
-    correlation_matrix = utils_explainability.getCorrelationFreqDomain(bear3, hi_curve_ims1)
+def matriz_simple2(bear3, hi_curve_ims1, ruta_carpeta, flag, sampling_frequency, shaft_frequency, BPFO, BPFI, BSF, FTF):
+    correlation_matrix = utils_explainability.getCorrelationFreqDomain(bear3, hi_curve_ims1, sampling_frequency, BPFO, BPFI, BSF, FTF, shaft_frequency)
     labels = ['HI', 'Fund. Filtered', 'BPFO Filtered', 'BPFI Filtered', 'FTF Filtered', 'BSF Filtered',
               'Fundamental', 'BPFO', 'BPFI', 'FTF', 'BSF']
     cm = pd.DataFrame(np.abs(correlation_matrix.values), columns=labels, index=labels)
