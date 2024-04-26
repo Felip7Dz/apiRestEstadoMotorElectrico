@@ -28,8 +28,19 @@ def getDatasetNew(name, samples, first_sample, user):
     return data[int(first_sample):int(first_sample)+int(samples)], denoised_data
 
 
+def getDatasetTmp(name, samples, first_sample, user):
+    data = np.array(pd.read_csv('prog_analizador/tmp/tmp' +str(name)+'.csv', header=None, index_col=None))
+    denoised_data = np.array(pd.read_csv('prog_analizador/saved_data/' + user + '/healthy' +str(name)+'.csv', header=None, index_col=None))
+    return data[int(first_sample):int(first_sample)+int(samples)], denoised_data
+
+
 def getNMax(name, user):
     data = np.array(pd.read_csv('prog_analizador/saved_data/' + user + '/' +str(name), header=None, index_col=None))
+    return data.shape[0]
+
+
+def getNMaxTmp(name):
+    data = np.array(pd.read_csv('prog_analizador/tmp/tmp' +str(name)+'.csv', header=None, index_col=None))
     return data.shape[0]
 
 
@@ -303,7 +314,7 @@ def determineFailure(ruta_carpeta, data, healthydata, hi_value, fs, fstart, fend
 
 
 def generateImg(members, fft_env, freq, carpeta, flag, name):
-    plt.figure()
+    plt.figure(figsize=(10.24, 7.68))
 
     for member in members:
         plt.axvline(member, color="red")
@@ -315,7 +326,9 @@ def generateImg(members, fft_env, freq, carpeta, flag, name):
     else:
         plt.plot(freq[0:last_member*5], fft_env[0:last_member*5], color="blue")
 
-    plt.title(name)
+    plt.title("FFT " + name)
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Amplitude")
     plt.savefig(os.path.join(carpeta, f'plot{flag}.png'))
 
 
@@ -328,7 +341,7 @@ def matriz_full(bear3, hi_curve_ims1, ruta_carpeta, flag, sampling_frequency, sh
     index = ['HI', 'Fund. Filtered', 'BPFO Filtered', 'BPFI Filtered', 'FTF Filtered', 'BSF Filtered',
              'Fundamental', 'BPFO', 'BPFI', 'FTF', 'BSF']
     cm = pd.DataFrame(np.abs(res), columns=columns, index=index)
-    plt.figure(figsize=(13, 9))
+    plt.figure(figsize=(10.24, 7.68))
     sns.heatmap(cm, annot=False, cmap='coolwarm', vmin=0, vmax=1)
     plt.savefig(os.path.join(ruta_carpeta, f'plot{flag}.png'))
 
@@ -341,7 +354,7 @@ def matriz_full2(bear3, hi_curve_ims1, ruta_carpeta, flag):
     columns = utils_explainability.create_columnname(num_subsamples)
     index = ['HI', 'RMS', 'Sk', 'K', 'CF', 'SF', 'IF', 'MF']
     cm = pd.DataFrame(np.abs(res), columns=columns, index=index)
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(10.24, 7.68))
     sns.heatmap(cm, annot=False, cmap='coolwarm', vmin=0, vmax=1)
     plt.savefig(os.path.join(ruta_carpeta, f'plot{flag}.png'))
 
@@ -350,9 +363,12 @@ def matriz_simple(bear3, hi_curve_ims1, ruta_carpeta, flag):
     correlation_matrix = utils_explainability.getCorrelationTimeDomain(bear3, hi_curve_ims1)
     labels = ['HI', 'RMS', 'Sk', 'K', 'CF', 'SF', 'IF', 'MF']
     cm = pd.DataFrame(np.abs(correlation_matrix.values), columns=labels, index=labels)
-    plt.figure(figsize=(12, 7))
+    plt.figure(figsize=(10.24, 7.68))
     sns.heatmap(cm, annot=True, cmap='coolwarm', vmin=0, vmax=1)
     plt.savefig(os.path.join(ruta_carpeta, f'plot{flag}.png'))
+    first_column = correlation_matrix.iloc[:, 0]
+    rounded_numbers = [round(num, 2) for num in first_column.tolist()]
+    return rounded_numbers
 
 
 def matriz_simple2(bear3, hi_curve_ims1, ruta_carpeta, flag, sampling_frequency, shaft_frequency, BPFO, BPFI, BSF, FTF):
@@ -360,6 +376,9 @@ def matriz_simple2(bear3, hi_curve_ims1, ruta_carpeta, flag, sampling_frequency,
     labels = ['HI', 'Fund. Filtered', 'BPFO Filtered', 'BPFI Filtered', 'FTF Filtered', 'BSF Filtered',
               'Fundamental', 'BPFO', 'BPFI', 'FTF', 'BSF']
     cm = pd.DataFrame(np.abs(correlation_matrix.values), columns=labels, index=labels)
-    plt.figure(figsize=(11, 8))
+    plt.figure(figsize=(10.24, 7.68))
     sns.heatmap(cm, annot=True, cmap='coolwarm', vmin=0, vmax=1)
     plt.savefig(os.path.join(ruta_carpeta, f'plot{flag}.png'))
+    first_column = correlation_matrix.iloc[:, 0]
+    rounded_numbers = [round(num, 2) for num in first_column.tolist()]
+    return rounded_numbers
