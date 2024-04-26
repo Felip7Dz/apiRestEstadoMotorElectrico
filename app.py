@@ -357,6 +357,8 @@ def guardar_archivo(archivo, flag, user):
             carpeta_guardado = 'prog_analizador/saved_models/' + user
         if flag==1:
             carpeta_guardado = 'prog_analizador/saved_data/' + user
+        if flag==3:
+            carpeta_guardado = 'prog_analizador/tmp/'
 
         ruta_guardado = os.path.join(os.path.dirname(__file__), carpeta_guardado)
 
@@ -374,31 +376,31 @@ def guardar_archivo(archivo, flag, user):
         raise e
 
 
-@app.route('/guardar_archivo/<string:user>', methods=['POST'])
-def guardarArchivo(user):
-    try:
-        flag = 0
-        guardar_archivo(request.files.get('archivo'), flag, user)
-
-        return 'Archivo guardado con éxito', 200
-    except Exception as e:
-        return str(e), 500
-
-
 @app.route('/saveData/<int:dataset_id>/<string:user>', methods=['POST'])
 def saveData(dataset_id, user):
     try:
         flag = 1
         name = request.form['fileName']
         ogName = request.form['ogName']
+
+        if name.startswith('tmp'):
+            guardar_archivo(request.files.get('archivo'), 3, user)
+            os.rename('prog_analizador/tmp/' + ogName, 'prog_analizador/tmp/' + name)
+            return 'Archivo guardado con éxito', 200
+
         guardar_archivo(request.files.get('archivo'), flag, user)
         os.rename('prog_analizador/saved_data/' + user + '/' + ogName, 'prog_analizador/saved_data/' + user + '/' + name)
-        tmp = enter_utils.getNMax(name, user)
 
-        if name.startswith('healthy') and tmp < 30:
+        #Metodo para crear csv healthy con primera fila de csv subido
+        primeraFilaCSV('prog_analizador/saved_data/' + user + '/' + name, 'prog_analizador/saved_data/' + user + '/' + 'healthy' + name)
+
+        tmp = enter_utils.getNMax(name, user)
+        tmp2 = enter_utils.getNMax('healthy'+name, user)
+
+        if tmp2 < 30:
             os.remove('prog_analizador/saved_data/' + user + '/' + name)
             return 'El archivo "healthy" debe tener al menos 30 muestras.', 400
-        elif not name.startswith('healthy') and tmp < 5:
+        if tmp < 5:
             os.remove('prog_analizador/saved_data/' + user + '/' + name)
             return 'El archivo debe tener al menos 5 muestras.', 400
 
@@ -406,17 +408,26 @@ def saveData(dataset_id, user):
         if not dataset:
             return jsonify({'error': 'Dataset no encontrado'}), 404
 
-        if name.startswith('healthy'):
-            dataset.files_added = 2
-        else:
-            dataset.files_added = 1
-
+        dataset.files_added = 1
         dataset.min_to_check = 0
         dataset.max_to_check = tmp
         db.session.commit()
         return 'Archivo guardado con éxito', 200
     except Exception as e:
         return str(e), 500
+
+
+def primeraFilaCSV(archivo_csv, ruta_destino):
+    primera_columna = []
+    with open(archivo_csv, 'r', newline='') as csvfile:
+        csvreader = csv.reader(csvfile)
+        for fila in csvreader:
+            primera_columna.append(fila[0])
+
+    with open(ruta_destino, 'w', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        for elemento in primera_columna:
+            csvwriter.writerow([elemento])
 
 
 @app.route('/analyze_data/<string:session_id>/<int:flag>', methods=['POST'])
@@ -455,6 +466,9 @@ def analyzeData(session_id, flag):
         if flag == 1:
             healthy_samples, denoised_healthy = enter_utils.getDatasetNew(dataset, healthy_number, 0, session_id)
 
+        if flag == 3:
+            healthy_samples, denoised_healthy = enter_utils.getDatasetTmp(dataset, healthy_number, 0, session_id)
+
         analyzed_number = data.get('analyzed_number_req')
         first_sample = data.get('first_sample_req')
         if flag == 0:
@@ -462,6 +476,11 @@ def analyzeData(session_id, flag):
 
         if flag == 1:
             analyzed_samples = enter_utils.getDatasetNew(dataset, analyzed_number, first_sample, session_id)[0]
+
+        if flag == 3:
+            analyzed_number = enter_utils.getNMaxTmp(dataset)
+            first_sample = 0
+            analyzed_samples = enter_utils.getDatasetTmp(dataset, analyzed_number, first_sample, session_id)[0]
 
         model_name = str(dataset) + '.h5'
 
@@ -494,6 +513,13 @@ def analyzeData(session_id, flag):
                 ms2ae_model.fit(healthy_samples, healthy_samples, epochs=epochs, batch_size=batch_size, verbose=0)
                 os.remove('prog_analizador/saved_models/' + session_id + '/' + str(dataset) + '.csv')
 
+        if flag == 3:
+            input_data = healthy_samples[0].reshape(-1, 1)
+            ms2ae_model = enter_utils.createModel('prog_analizador/tmp/tmp' + str(model_name), input_data)
+            epochs = 5
+            batch_size = 64
+            ms2ae_model.fit(healthy_samples, healthy_samples, epochs=epochs, batch_size=batch_size, verbose=0)
+
         HI_healthy_samples = ms2ae_model.predict(healthy_samples, verbose=0)
         HI_analyzed_samples = ms2ae_model.predict(analyzed_samples, verbose=0)
         threshold = enter_utils.getThreshold(HI_healthy_samples)
@@ -501,6 +527,9 @@ def analyzeData(session_id, flag):
         isFaulty, faultySample = enter_utils.checkStage(HI_analyzed_samples, threshold)
 
         if not isFaulty:
+            if flag == 3:
+                os.remove('prog_analizador/tmp/tmp' + str(dataset) + '.csv')
+                os.remove('prog_analizador/tmp/tmp' + str(dataset) + '.h5')
             return jsonify({'fault_detected': False}), 200
 
         diff_harmonics = enter_utils.differenceSignals(denoised_healthy.flatten(), analyzed_samples[faultySample])
@@ -512,12 +541,20 @@ def analyzeData(session_id, flag):
         if isFaulty:
             if flag == 1:
                 tmp_samples = enter_utils.getDatasetNew(dataset, first_sample + analyzed_number, 0, session_id)[0]
-            else:
+            if flag == 0:
                 tmp_samples = enter_utils.getDataset(dataset, first_sample + analyzed_number, 0)[0]
+            if flag == 3:
+                tmp_samples = enter_utils.getDatasetTmp(dataset, first_sample + analyzed_number, 0, session_id)[0]
             enter_utils.matriz_full(tmp_samples, ms2ae_model.predict(tmp_samples, verbose=0), ruta_carpeta, 5, int(sampling_frequency), int(shaft_frequency), int(BPFO), int(BPFI), int(BSF), int(FTF))
             enter_utils.matriz_full2(tmp_samples, ms2ae_model.predict(tmp_samples, verbose=0), ruta_carpeta, 6)
-            enter_utils.matriz_simple(tmp_samples, ms2ae_model.predict(tmp_samples, verbose=0), ruta_carpeta, 7)
-            enter_utils.matriz_simple2(tmp_samples, ms2ae_model.predict(tmp_samples, verbose=0), ruta_carpeta, 8, int(sampling_frequency), int(shaft_frequency), int(BPFO), int(BPFI), int(BSF), int(FTF))
+            resultTimeReport = enter_utils.matriz_simple(tmp_samples, ms2ae_model.predict(tmp_samples, verbose=0), ruta_carpeta, 7)
+            resultFreqReport = enter_utils.matriz_simple2(tmp_samples, ms2ae_model.predict(tmp_samples, verbose=0), ruta_carpeta, 8, int(sampling_frequency), int(shaft_frequency), int(BPFO), int(BPFI), int(BSF), int(FTF))
+            result['resultTimeReport'] = resultTimeReport
+            result['resultFreqReport'] = resultFreqReport
+
+        if flag == 3:
+            os.remove('prog_analizador/tmp/tmp' + str(dataset) + '.csv')
+            os.remove('prog_analizador/tmp/tmp' + str(dataset) + '.h5')
 
         return jsonify(result), 200
 
