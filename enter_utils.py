@@ -40,7 +40,7 @@ def getNMax(name, user):
 
 
 def getNMaxTmp(name):
-    data = np.array(pd.read_csv('prog_analizador/tmp/tmp' +str(name)+'.csv', header=None, index_col=None))
+    data = np.array(pd.read_csv('prog_analizador/tmp/' +str(name), header=None, index_col=None))
     return data.shape[0]
 
 
