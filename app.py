@@ -5,6 +5,8 @@ import shutil
 import warnings
 import keras
 import csv
+
+import pandas as pd
 from flask import Flask, jsonify, request, send_file
 from flask_sqlalchemy import SQLAlchemy
 import enter_utils
@@ -41,6 +43,7 @@ class Usuarios(db.Model):
     email = db.Column(db.String(255), unique=True, nullable=False)
     passw = db.Column(db.String(255), unique=True, nullable=False)
     roles = db.Column(db.String(255), unique=True, nullable=False)
+    maxdataset = db.Column(db.Integer, nullable=False)
 
 
 @app.route('/checkUser/<string:username>', methods=['GET'])
@@ -64,7 +67,8 @@ def registerUser():
             apellido=data['apellido'],
             email=data['email'],
             passw=data['passw'],
-            roles=data['role']
+            roles=data['role'],
+            maxdataset=data['maxdataset']
         )
 
         db.session.add(new_user)
@@ -86,7 +90,8 @@ def getUserByName(username):
                 'usuario': user.usuario,
                 'nombre': user.nombre,
                 'apellido': user.apellido,
-                'email': user.email
+                'email': user.email,
+                'maxdataset': user.maxdataset
             })
         else:
             return jsonify({'nombre': 'Dataset not found'})
@@ -106,7 +111,8 @@ def getAllUsers():
                     'nombre': user.nombre,
                     'apellido': user.apellido,
                     'email': user.email,
-                    'role': user.roles
+                    'role': user.roles,
+                    'maxdataset': user.maxdataset
                 }
                 users_list.append(user_data)
             return jsonify(users_list)
@@ -127,6 +133,7 @@ def updateUser(username):
         user.apellido = data.get('apellido', user.apellido)
         user.email = data.get('email', user.email)
         user.passw = data.get('passw', user.passw)
+        user.maxdataset = data.get('maxdataset', user.maxdataset)
         db.session.commit()
 
         return jsonify({'message': 'Dataset actualizado correctamente'}), 200
@@ -346,10 +353,10 @@ def deleteSample(dataset_id, user):
 
     dataset.files_added = 0
     db.session.commit()
-    return 'Archivo guardado con éxito', 200
+    return 'Archivo guardado con exito', 200
 
 
-def guardar_archivo(archivo, flag, user):
+def saveFile(archivo, flag, user):
     carpeta_guardado: str = ''
     try:
 
@@ -371,7 +378,7 @@ def guardar_archivo(archivo, flag, user):
 
             return ruta_guardar
         else:
-            raise ValueError('No se proporcionó ningún archivo en la solicitud')
+            raise ValueError('No se proporciono ningun archivo en la solicitud')
     except Exception as e:
         raise e
 
@@ -384,11 +391,15 @@ def saveData(dataset_id, user):
         ogName = request.form['ogName']
 
         if name.startswith('tmp'):
-            guardar_archivo(request.files.get('archivo'), 3, user)
+            saveFile(request.files.get('archivo'), 3, user)
             os.rename('prog_analizador/tmp/' + ogName, 'prog_analizador/tmp/' + name)
-            return 'Archivo guardado con éxito', 200
+            tmp2 = enter_utils.getNMaxTmp(name)
+            if tmp2 < 5:
+                os.remove('prog_analizador/tmp/' + name)
+                return 'El archivo debe tener al menos 30 muestras.', 202
+            return 'Archivo guardado con exito', 200
 
-        guardar_archivo(request.files.get('archivo'), flag, user)
+        saveFile(request.files.get('archivo'), flag, user)
         os.rename('prog_analizador/saved_data/' + user + '/' + ogName, 'prog_analizador/saved_data/' + user + '/' + name)
 
         #Metodo para crear csv healthy con primera fila de csv subido
@@ -397,12 +408,10 @@ def saveData(dataset_id, user):
         tmp = enter_utils.getNMax(name, user)
         tmp2 = enter_utils.getNMax('healthy'+name, user)
 
-        if tmp2 < 30:
+        if tmp < 30:
             os.remove('prog_analizador/saved_data/' + user + '/' + name)
-            return 'El archivo "healthy" debe tener al menos 30 muestras.', 400
-        if tmp < 5:
-            os.remove('prog_analizador/saved_data/' + user + '/' + name)
-            return 'El archivo debe tener al menos 5 muestras.', 400
+            os.remove('prog_analizador/saved_data/' + user + '/healthy' + name)
+            return 'El archivo "healthy" debe tener al menos 30 muestras.', 202
 
         dataset = Dataset.query.get(dataset_id)
         if not dataset:
@@ -412,25 +421,17 @@ def saveData(dataset_id, user):
         dataset.min_to_check = 0
         dataset.max_to_check = tmp
         db.session.commit()
-        return 'Archivo guardado con éxito', 200
+        return 'Archivo guardado con exito', 200
     except Exception as e:
         return str(e), 500
 
 
 def primeraFilaCSV(archivo_csv, ruta_destino):
-    primera_columna = []
-    with open(archivo_csv, 'r', newline='') as csvfile:
-        csvreader = csv.reader(csvfile)
-        for fila in csvreader:
-            primera_columna.append(fila[0])
+    data = pd.read_csv(archivo_csv, header=None, index_col=False)
+    tmp = data.iloc[0]
+    pd.DataFrame(tmp).to_csv(ruta_destino, header=None, index=False)
 
-    with open(ruta_destino, 'w', newline='') as csvfile:
-        csvwriter = csv.writer(csvfile)
-        for elemento in primera_columna:
-            csvwriter.writerow([elemento])
-
-
-@app.route('/analyze_data/<string:session_id>/<int:flag>', methods=['POST'])
+@app.route('/analyzeData/<string:session_id>/<int:flag>', methods=['POST'])
 def analyzeData(session_id, flag):
     try:
         warnings.filterwarnings("ignore")
@@ -463,11 +464,8 @@ def analyzeData(session_id, flag):
         if flag == 0:
             healthy_samples, denoised_healthy = enter_utils.getDataset(dataset, healthy_number, 0)
 
-        if flag == 1:
+        if flag == 1 or flag == 3:
             healthy_samples, denoised_healthy = enter_utils.getDatasetNew(dataset, healthy_number, 0, session_id)
-
-        if flag == 3:
-            healthy_samples, denoised_healthy = enter_utils.getDatasetTmp(dataset, healthy_number, 0, session_id)
 
         analyzed_number = data.get('analyzed_number_req')
         first_sample = data.get('first_sample_req')
@@ -478,7 +476,17 @@ def analyzeData(session_id, flag):
             analyzed_samples = enter_utils.getDatasetNew(dataset, analyzed_number, first_sample, session_id)[0]
 
         if flag == 3:
-            analyzed_number = enter_utils.getNMaxTmp(dataset)
+            analyzed_number = enter_utils.getNMaxTmp('tmp'+dataset+'.csv')
+            if (analyzed_number < healthy_number):
+                result = {
+                    'fault_detected': False,
+                    'fault_info': 'healthy',
+                    'fault_type': [],
+                    'fault_details': [],
+                    'analysis_result': None
+                }
+                os.remove('prog_analizador/tmp/tmp' + str(dataset) + '.csv')
+                return jsonify(result), 200
             first_sample = 0
             analyzed_samples = enter_utils.getDatasetTmp(dataset, analyzed_number, first_sample, session_id)[0]
 
@@ -498,7 +506,7 @@ def analyzeData(session_id, flag):
                 batch_size = 64
                 ms2ae_model.fit(healthy_samples, healthy_samples, epochs=epochs, batch_size=batch_size, verbose=0)
 
-        if flag == 1:
+        if flag == 1 or flag == 3:
             if os.path.isfile('prog_analizador/saved_models/' + session_id + '/' + model_name):
                 custom_objects = {'MonotonicityLayer2': enter_utils.MonotonicityLayer2,
                                   'SmoothingLayer': enter_utils.SmoothingLayer,
@@ -513,13 +521,6 @@ def analyzeData(session_id, flag):
                 ms2ae_model.fit(healthy_samples, healthy_samples, epochs=epochs, batch_size=batch_size, verbose=0)
                 os.remove('prog_analizador/saved_models/' + session_id + '/' + str(dataset) + '.csv')
 
-        if flag == 3:
-            input_data = healthy_samples[0].reshape(-1, 1)
-            ms2ae_model = enter_utils.createModel('prog_analizador/tmp/tmp' + str(model_name), input_data)
-            epochs = 5
-            batch_size = 64
-            ms2ae_model.fit(healthy_samples, healthy_samples, epochs=epochs, batch_size=batch_size, verbose=0)
-
         HI_healthy_samples = ms2ae_model.predict(healthy_samples, verbose=0)
         HI_analyzed_samples = ms2ae_model.predict(analyzed_samples, verbose=0)
         threshold = enter_utils.getThreshold(HI_healthy_samples)
@@ -529,7 +530,6 @@ def analyzeData(session_id, flag):
         if not isFaulty:
             if flag == 3:
                 os.remove('prog_analizador/tmp/tmp' + str(dataset) + '.csv')
-                os.remove('prog_analizador/tmp/tmp' + str(dataset) + '.h5')
             return jsonify({'fault_detected': False}), 200
 
         diff_harmonics = enter_utils.differenceSignals(denoised_healthy.flatten(), analyzed_samples[faultySample])
@@ -554,7 +554,6 @@ def analyzeData(session_id, flag):
 
         if flag == 3:
             os.remove('prog_analizador/tmp/tmp' + str(dataset) + '.csv')
-            os.remove('prog_analizador/tmp/tmp' + str(dataset) + '.h5')
 
         return jsonify(result), 200
 
@@ -562,7 +561,7 @@ def analyzeData(session_id, flag):
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/get_image/<string:session_id>/<int:flag>', methods=['GET'])
+@app.route('/getImage/<string:session_id>/<int:flag>', methods=['GET'])
 def getImage(session_id, flag):
     try:
         image_path = os.path.join('img/' + session_id, f'plot{flag}.png')
