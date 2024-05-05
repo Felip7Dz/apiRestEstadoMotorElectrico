@@ -226,8 +226,8 @@ def insertDataset(username):
         return '1', 500
 
 
-@app.route('/updateDataset/<int:dataset_id>', methods=['PUT'])
-def updateDataset(dataset_id):
+@app.route('/updateDataset/<int:dataset_id>/<string:user>', methods=['PUT'])
+def updateDataset(dataset_id, user):
     try:
         data = request.json
 
@@ -235,7 +235,11 @@ def updateDataset(dataset_id):
         if not dataset:
             return jsonify({'error': 'Dataset no encontrado'}), 404
 
-        os.rename('prog_analizador/saved_models/' + dataset.nombre + '.csv', 'prog_analizador/saved_models/' + data['nombre'] + '.csv')
+        if dataset.nombre != data['nombre']:
+            if os.path.exists('prog_analizador/saved_models/'+ user + '/' + dataset.nombre + '.csv'):
+                os.rename('prog_analizador/saved_models/'+ user + '/' + dataset.nombre + '.csv', 'prog_analizador/saved_models/'+ user + '/' + data['nombre'] + '.csv')
+            if os.path.exists('prog_analizador/saved_models/'+ user + '/' + dataset.nombre + '.h5'):
+                os.rename('prog_analizador/saved_models/'+ user + '/' + dataset.nombre + '.h5', 'prog_analizador/saved_models/'+ user + '/' + data['nombre'] + '.h5')
 
         dataset.nombre = data.get('nombre', dataset.nombre)
         dataset.shaft_frequency = data.get('shaft_frequency', dataset.shaft_frequency)
@@ -558,6 +562,7 @@ def analyzeData(session_id, flag):
         return jsonify(result), 200
 
     except Exception as e:
+        os.remove('prog_analizador/tmp/tmp' + str(dataset) + '.csv')
         return jsonify({'error': str(e)}), 500
 
 
